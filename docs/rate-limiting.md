@@ -10,8 +10,8 @@ Core extension points:
 |------|----------------|
 | `RateLimitKeyResolver` | Turns an `HttpServletRequest` into a **string key** (who is being limited). Default: `IpRateLimitKeyResolver` → `ClientIpResolver` (IP). |
 | `RateLimiter` | Decides whether a request is allowed for a given key. Default: **`TokenBucketRateLimiter`**. |
-| `RateLimiterSelector` | Chooses which **`RateLimiter`** applies to this request (e.g. by JWT role). Default: **`FixedRateLimiterSelector`** (always the configured bucket). When **`ratelimiter.jwt.secret`** is non-empty, default wiring uses **`JwtRoleRateLimiterSelector`**: missing/invalid JWT or non-admin **`role`** claim → user bucket; admin → separate bucket with **`ratelimiter.admin-rate-limit`**. |
-| `RateLimitMediator` | **Mediator**: `tryAcquire(request)` → resolve key, **`RateLimiterSelector.select(request)`**, then **`tryAcquire(key)`** on the chosen limiter. Default: **`DefaultRateLimitMediator`**. |
+| `RateLimiterSelector` | **`select(request)`** only: picks which **`RateLimiter`** applies (e.g. by JWT role); **does not** take or forward the rate-limit key. Default: **`FixedRateLimiterSelector`**. When **`ratelimiter.jwt.secret`** is set: **`JwtRoleRateLimiterSelector`** (missing/invalid JWT or non-admin **`role`** → user bucket; admin → **`ratelimiter.admin-rate-limit`** bucket). |
+| `RateLimitMediator` | **Mediator**: `tryAcquire(request)` → **`RateLimitKeyResolver`** yields the key; **`RateLimiterSelector.select(request)`** picks the limiter **without** the key; mediator then **`tryAcquire(key)`** on that limiter. Default: **`DefaultRateLimitMediator`**. |
 
 ## High-level view
 
@@ -67,8 +67,8 @@ Calls **`rateLimitMediator.tryAcquire(request)`**. If `false`, **429** and retur
 ### 3. `RateLimitMediator` (default: `DefaultRateLimitMediator`)
 
 1. **`keyResolver.resolveKey(request)`** → string key.
-2. **`rateLimiterSelector.select(request)`** → **`RateLimiter`** for this request (JWT role or fixed).
-3. **`rateLimiter.tryAcquire(key)`** on that instance → pass/fail for the request.
+2. **`rateLimiterSelector.select(request)`** → **`RateLimiter`** for this request (no key; e.g. JWT role or fixed).
+3. **`rateLimiter.tryAcquire(key)`** → pass/fail for the request.
 
 ### 4. `RateLimitKeyResolver` (default: `IpRateLimitKeyResolver`)
 
@@ -147,7 +147,7 @@ You can combine a custom **`RateLimiter`** with the default **`IpRateLimitKeyRes
 
 ### Role-based limiter (custom selector)
 
-Implement **`RateLimiterSelector`** to return different **`RateLimiter`** instances or equivalent policies. Register a **`@Bean`** of type **`RateLimiterSelector`**; the default selector bean is skipped when yours is present. You can keep **`DefaultRateLimitMediator`**; it injects **`RateLimiterSelector`**.
+Implement **`RateLimiterSelector`** (`select(request)` only; no key) to return different **`RateLimiter`** instances or equivalent policies. Register a **`@Bean`** of type **`RateLimiterSelector`**; the default selector bean is skipped when yours is present. You can keep **`DefaultRateLimitMediator`**; it injects **`RateLimiterSelector`**.
 
 ### Custom orchestration
 
@@ -161,7 +161,7 @@ Implement **`RateLimitMediator`** if you need different coordination (e.g. multi
 | Gate | `RateLimitFilter` | delegates `tryAcquire(request)` to mediator; 429 or continue chain |
 | Mediator | `RateLimitMediator` | composes `RateLimitKeyResolver` + `RateLimiterSelector` + chosen `RateLimiter` (default: `DefaultRateLimitMediator`) |
 | Key | `RateLimitKeyResolver` | Request → key string (default: IP via `IpRateLimitKeyResolver` / `ClientIpResolver`) |
-| Selector | `RateLimiterSelector` | Request → `RateLimiter` (default: `FixedRateLimiterSelector`; JWT: `JwtRoleRateLimiterSelector` when secret set) |
+| Selector | `RateLimiterSelector` | Request → which `RateLimiter` to use via `select(request)` only; key is not passed (default: `FixedRateLimiterSelector`; JWT: `JwtRoleRateLimiterSelector` when secret set) |
 | Policy | `RateLimiter` | One logical limiter per key (default: `TokenBucketRateLimiter`) |
 | IP layer | `IpRateLimiter` | Per-IP API over `TokenBucketRateLimiter` (optional bean) |
 | Config | `RatelimiterProperties`, `RatelimiterConfiguration` | Limits, forward URL, `Clock`, default beans |

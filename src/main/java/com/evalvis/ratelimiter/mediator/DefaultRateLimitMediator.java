@@ -23,7 +23,8 @@ public final class DefaultRateLimitMediator implements RateLimitMediator {
 	@Override
 	public boolean tryAcquire(HttpServletRequest request) {
 		String key = keyResolver.resolveKey(request);
-		return rateLimiterSelector.select(request).tryAcquire(key);
+		RateLimiter rateLimiter = rateLimiterSelector.select(request);
+		return rateLimiter.tryAcquire(key);
 	}
 
 }
