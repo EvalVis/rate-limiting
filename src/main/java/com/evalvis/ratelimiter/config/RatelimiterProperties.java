@@ -7,6 +7,8 @@ public class RatelimiterProperties {
 
 	private Forward forward = new Forward();
 	private RateLimit rateLimit = new RateLimit();
+	private RateLimit adminRateLimit = new RateLimit();
+	private Jwt jwt = new Jwt();
 
 	public Forward getForward() {
 		return forward;
@@ -22,6 +24,22 @@ public class RatelimiterProperties {
 
 	public void setRateLimit(RateLimit rateLimit) {
 		this.rateLimit = rateLimit;
+	}
+
+	public RateLimit getAdminRateLimit() {
+		return adminRateLimit;
+	}
+
+	public void setAdminRateLimit(RateLimit adminRateLimit) {
+		this.adminRateLimit = adminRateLimit;
+	}
+
+	public Jwt getJwt() {
+		return jwt;
+	}
+
+	public void setJwt(Jwt jwt) {
+		this.jwt = jwt;
 	}
 
 	public static class Forward {
@@ -83,4 +101,41 @@ public class RatelimiterProperties {
 
 	}
 
+	public static class Jwt {
+
+		private String secret = "";
+		private String roleClaim = "role";
+		private String adminRoleValue = "admin";
+
+		public String getSecret() {
+			return secret;
+		}
+
+		public void setSecret(String secret) {
+			this.secret = secret;
+		}
+
+		public String getRoleClaim() {
+			return roleClaim;
+		}
+
+		public void setRoleClaim(String roleClaim) {
+			this.roleClaim = roleClaim;
+		}
+
+		public String getAdminRoleValue() {
+			return adminRoleValue;
+		}
+
+		public void setAdminRoleValue(String adminRoleValue) {
+			this.adminRoleValue = adminRoleValue;
+		}
+
+		public boolean isConfigured() {
+			return secret != null && !secret.isBlank();
+		}
+
+	}
+
 }
+

@@ -10,3 +10,10 @@ ratelimiter:
   rate-limit:
     capacity: 100
     refill-per-second: 10.0
+  admin-rate-limit:
+    capacity: 500
+    refill-per-second: 50.0
+  jwt:
+    secret: ""
+    role-claim: role
+    admin-role-value: admin
