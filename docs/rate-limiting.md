@@ -9,7 +9,7 @@ Core extension points:
 | Type | Responsibility |
 |------|----------------|
 | `RateLimitKeyResolver` | Turns an `HttpServletRequest` into a **string key** (who is being limited). Default: `IpRateLimitKeyResolver` → `ClientIpResolver` (IP / `X-Forwarded-For`). |
-| `RateLimiter` | Decides whether a request is allowed for a given key. Default: **`TokenBucketRateLimiter`** (token bucket per key). |
+| `RateLimiter` | Decides whether a request is allowed for a given key. Default: **`TokenBucketRateLimiter`**. |
 | `RateLimitMediator` | **Mediator** between the two: `tryAcquire(request)` → resolve key, then run the limiter. Default: **`DefaultRateLimitMediator`**. |
 
 ## High-level view
@@ -48,7 +48,7 @@ flowchart LR
 At a glance:
 
 - **Rate limiting** runs in a servlet **filter** before Spring MVC dispatches to `ProxyController`.
-- **`RateLimitMediator`** composes key resolution and the limiter; default wires IP resolver + token bucket.
+- **`RateLimitMediator`** composes key resolution and the limiter; default wires IP resolver + `RateLimiter`.
 - **Proxying** is unchanged: catch-all controller + `WebClient` to the configured base URL.
 
 ## Request path through the stack
@@ -98,7 +98,6 @@ sequenceDiagram
   participant M as RateLimitMediator
   participant KR as RateLimitKeyResolver
   participant RL as RateLimiter
-  participant TB as TokenBucket
   participant D as DispatcherServlet
   participant P as ProxyController
   participant W as WebClient
@@ -109,9 +108,7 @@ sequenceDiagram
   M->>KR: resolveKey(request)
   KR-->>M: key string
   M->>RL: tryAcquire(key)
-  RL->>TB: tryConsume (get or create bucket)
-  TB-->>RL: true / false
-  RL-->>M: true / false
+  RL-->>M: allowed / denied
   M-->>F: true / false
   alt rejected
     F-->>C: 429, stop
@@ -154,6 +151,5 @@ Implement **`RateLimitMediator`** if you need different coordination (e.g. multi
 | Key | `RateLimitKeyResolver` | Request → key string (default: IP via `IpRateLimitKeyResolver` / `ClientIpResolver`) |
 | Policy | `RateLimiter` | One logical limiter per key (default: `TokenBucketRateLimiter`) |
 | IP layer | `IpRateLimiter` | Per-IP API over `TokenBucketRateLimiter` (optional bean) |
-| Algorithm | `TokenBucket` | Refill + consume one token per request (used inside `TokenBucketRateLimiter`) |
 | Config | `RatelimiterProperties`, `RatelimiterConfiguration` | Limits, forward URL, `Clock`, default beans |
 | Forward | `ProxyController`, `WebClient`, `HopByHopHeaders` | Proxy allowed requests to configured backend |
