@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: ratelimiter
+
+ratelimiter:
+  forward:
+    host: 127.0.0.1
+    port: 8080
+    scheme: http
+  rate-limit:
+    capacity: 100
+    refill-per-second: 10.0
