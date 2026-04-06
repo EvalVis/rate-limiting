@@ -20,13 +20,19 @@ flowchart LR
   subgraph client [Client]
     C[Browser / caller]
   end
-  subgraph ratelimiter [This application]
+  subgraph ratelimiter [ ]
     T[Tomcat]
     F[RateLimitFilter]
-    M[RateLimitMediator]
-    KR[RateLimitKeyResolver]
-    RS[RateLimiterSelector]
-    RL[RateLimiter]
+    subgraph gate [ ]
+      M[RateLimitMediator]
+      KR[RateLimitKeyResolver]
+      RS[RateLimiterSelector]
+      RL[RateLimiter]
+      M --> KR
+      M --> RS
+      M --> RL
+      RS -.->|select returns instance| RL
+    end
     PC[ProxyController]
     WC[WebClient]
   end
@@ -36,9 +42,6 @@ flowchart LR
   C --> T
   T --> F
   F --> M
-  M --> KR
-  M --> RS
-  RS --> RL
   F -->|allowed| PC
   F -->|denied 429| C
   PC --> WC
