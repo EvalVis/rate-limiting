@@ -8,7 +8,7 @@ Core extension points:
 
 | Type | Responsibility |
 |------|----------------|
-| `RateLimitKeyResolver` | Turns an `HttpServletRequest` into a **string key** (who is being limited). Default: `IpRateLimitKeyResolver` → `ClientIpResolver` (IP / `X-Forwarded-For`). |
+| `RateLimitKeyResolver` | Turns an `HttpServletRequest` into a **string key** (who is being limited). Default: `IpRateLimitKeyResolver` → `ClientIpResolver` (IP). |
 | `RateLimiter` | Decides whether a request is allowed for a given key. Default: **`TokenBucketRateLimiter`**. |
 | `RateLimitMediator` | **Mediator** between the two: `tryAcquire(request)` → resolve key, then run the limiter. Default: **`DefaultRateLimitMediator`**. |
 
