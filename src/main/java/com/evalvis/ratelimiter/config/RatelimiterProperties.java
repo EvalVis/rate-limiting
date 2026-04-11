@@ -82,6 +82,7 @@ public class RatelimiterProperties {
 
 		private double capacity = 100;
 		private double refillPerSecond = 10;
+		private RateLimitAlgorithm algorithm = RateLimitAlgorithm.TOKEN_BUCKET;
 
 		public double getCapacity() {
 			return capacity;
@@ -99,6 +100,19 @@ public class RatelimiterProperties {
 			this.refillPerSecond = refillPerSecond;
 		}
 
+		public RateLimitAlgorithm getAlgorithm() {
+			return algorithm;
+		}
+
+		public void setAlgorithm(RateLimitAlgorithm algorithm) {
+			this.algorithm = algorithm;
+		}
+
+	}
+
+	public enum RateLimitAlgorithm {
+		TOKEN_BUCKET,
+		LEAKY_BUCKET
 	}
 
 	public static class Jwt {

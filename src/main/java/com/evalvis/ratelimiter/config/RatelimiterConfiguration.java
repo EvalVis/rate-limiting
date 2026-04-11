@@ -5,12 +5,14 @@ import com.evalvis.ratelimiter.key.RateLimitKeyResolver;
 import com.evalvis.ratelimiter.mediator.DefaultRateLimitMediator;
 import com.evalvis.ratelimiter.mediator.RateLimitMediator;
 import com.evalvis.ratelimiter.rate.IpRateLimiter;
+import com.evalvis.ratelimiter.rate.LeakyBucketRateLimiter;
 import com.evalvis.ratelimiter.rate.RateLimiter;
 import com.evalvis.ratelimiter.rate.TokenBucketRateLimiter;
 import com.evalvis.ratelimiter.selector.FixedRateLimiterSelector;
 import com.evalvis.ratelimiter.selector.JwtRoleRateLimiterSelector;
 import com.evalvis.ratelimiter.selector.RateLimiterSelector;
 import java.time.Clock;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -27,20 +29,17 @@ public class RatelimiterConfiguration {
 		return Clock.systemUTC();
 	}
 
-	@Bean
+	@Bean("rateLimiter")
 	@ConditionalOnMissingBean(RateLimiter.class)
-	public TokenBucketRateLimiter tokenBucketRateLimiter(RatelimiterProperties properties, Clock clock) {
-		return new TokenBucketRateLimiter(
-			properties.getRateLimit().getCapacity(),
-			properties.getRateLimit().getRefillPerSecond(),
-			clock
-		);
+	public RateLimiter rateLimiter(RatelimiterProperties properties, Clock clock) {
+		return rateLimiterFromSpec(properties.getRateLimit(), clock);
 	}
 
 	@Bean
-	@ConditionalOnBean(TokenBucketRateLimiter.class)
-	public IpRateLimiter ipRateLimiter(TokenBucketRateLimiter tokenBucketRateLimiter) {
-		return new IpRateLimiter(tokenBucketRateLimiter);
+	@ConditionalOnMissingBean(IpRateLimiter.class)
+	@ConditionalOnBean(name = "rateLimiter")
+	public IpRateLimiter ipRateLimiter(@Qualifier("rateLimiter") RateLimiter rateLimiter) {
+		return new IpRateLimiter(rateLimiter);
 	}
 
 	@Bean
@@ -55,11 +54,7 @@ public class RatelimiterConfiguration {
 		if (!properties.getJwt().isConfigured()) {
 			return new FixedRateLimiterSelector(rateLimiter);
 		}
-		RateLimiter adminLimiter = new TokenBucketRateLimiter(
-			properties.getAdminRateLimit().getCapacity(),
-			properties.getAdminRateLimit().getRefillPerSecond(),
-			clock
-		);
+		RateLimiter adminLimiter = rateLimiterFromSpec(properties.getAdminRateLimit(), clock);
 		return new JwtRoleRateLimiterSelector(
 			properties.getJwt().getSecret(),
 			properties.getJwt().getRoleClaim(),
@@ -80,6 +75,13 @@ public class RatelimiterConfiguration {
 		return WebClient.builder()
 			.baseUrl(properties.getForward().baseUrl())
 			.build();
+	}
+
+	static RateLimiter rateLimiterFromSpec(RatelimiterProperties.RateLimit spec, Clock clock) {
+		if (spec.getAlgorithm() == RatelimiterProperties.RateLimitAlgorithm.LEAKY_BUCKET) {
+			return new LeakyBucketRateLimiter(spec.getCapacity(), spec.getRefillPerSecond(), clock);
+		}
+		return new TokenBucketRateLimiter(spec.getCapacity(), spec.getRefillPerSecond(), clock);
 	}
 
 }
