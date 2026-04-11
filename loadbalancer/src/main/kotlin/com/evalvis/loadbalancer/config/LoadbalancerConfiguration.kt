@@ -1,5 +1,8 @@
 package com.evalvis.loadbalancer.config
 
+import com.evalvis.loadbalancer.balance.BackendTargetSelector
+import com.evalvis.loadbalancer.balance.ConsistentHashBackendSelector
+import com.evalvis.loadbalancer.balance.ConsistentHashRing
 import com.evalvis.loadbalancer.balance.RoundRobinTargetPicker
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -9,8 +12,11 @@ import org.springframework.web.reactive.function.client.WebClient
 class LoadbalancerConfiguration {
 
 	@Bean
-	fun roundRobinTargetPicker(properties: LoadbalancerProperties): RoundRobinTargetPicker {
-		return RoundRobinTargetPicker(properties.ips)
+	fun backendTargetSelector(properties: LoadbalancerProperties): BackendTargetSelector {
+		return when (properties.strategy) {
+			LoadBalancingStrategy.CONSISTENT_HASH -> ConsistentHashBackendSelector(ConsistentHashRing(properties.ips))
+			LoadBalancingStrategy.ROUND_ROBIN -> RoundRobinTargetPicker(properties.ips)
+		}
 	}
 
 	@Bean

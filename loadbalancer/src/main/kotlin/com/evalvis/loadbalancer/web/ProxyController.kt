@@ -1,6 +1,6 @@
 package com.evalvis.loadbalancer.web
 
-import com.evalvis.loadbalancer.balance.RoundRobinTargetPicker
+import com.evalvis.loadbalancer.balance.BackendTargetSelector
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
@@ -19,7 +19,7 @@ import java.util.Enumeration
 
 @RestController
 class ProxyController(
-	private val targetPicker: RoundRobinTargetPicker,
+	private val backendTargetSelector: BackendTargetSelector,
 	private val forwardWebClient: WebClient,
 ) {
 
@@ -38,7 +38,7 @@ class ProxyController(
 	fun proxy(request: HttpServletRequest): ResponseEntity<ByteArray> {
 		val relativeUri = buildRelativeUri(request)
 		val method = HttpMethod.valueOf(request.method)
-		val targetUri = resolveTargetUri(targetPicker.next(), relativeUri)
+		val targetUri = resolveTargetUri(backendTargetSelector.selectTarget(request), relativeUri)
 		return forwardWebClient.method(method)
 			.uri(targetUri)
 			.headers { copyRequestHeaders(request, it) }

@@ -9,10 +9,10 @@ flowchart LR
   end
   subgraph loadbalancer [ ]
     T[Tomcat]
-    RR[RoundRobinTargetPicker]
+    S[BackendTargetSelector]
     PC[ProxyController]
     WC[WebClient]
-    Y[application.yaml ips]
+    Y[application.yaml]
   end
   subgraph backends [Configured backends]
     B1[Upstream 1]
@@ -20,25 +20,35 @@ flowchart LR
   end
   C --> T
   T --> PC
-  Y -.->|binds| RR
-  PC --> RR
+  Y -.->|ips + strategy| S
+  PC --> S
   PC --> WC
-  RR -->|next base URL| PC
+  S -->|base URL| PC
   WC --> B1
   WC --> B2
 ```
 
-Traffic enters the load balancer as ordinary HTTP. For each request, **`RoundRobinTargetPicker`** chooses the next **`loadbalancer.ips`** entry in rotation. **`ProxyController`** forwards the same method, path, query, headers, and body to that base URL using **`WebClient`**, then returns the upstream response.
+Traffic enters the load balancer as ordinary HTTP. **`ProxyController`** asks **`BackendTargetSelector`** for a base URL, then forwards method, path, query, headers, and body with **`WebClient`**.
+
+**`loadbalancer.strategy`:**
+
+- **`round-robin`** — cycles through **`loadbalancer.ips`** in order.
+- **`consistent-hash`** — one point per backend on a hash ring (no virtual nodes). Each backend URL’s **host** string (the configured server identity, typically a literal IP or hostname) is hashed onto the ring. The client IP from **`X-Forwarded-For`** (first hop) or **`remoteAddr`** is hashed; the request is sent to the first backend at or after that position on the ring, wrapping to the smallest position if needed (full ring). Use **distinct host values** per backend (for example different IPs or `127.0.0.1` vs `localhost`) so each server gets its own slot; two URLs that share the same host collapse to one slot.
+
+Hashes use **Guava MurmurHash3 128-bit** (`asLong()`), which is deterministic and stable for the same strings.
 
 ## Configuration
 
-Set **`loadbalancer.ips`** to full base URLs (scheme, host, port) of each backend instances:
+Set **`loadbalancer.ips`** to full base URLs (scheme, host, port) of each backend. For consistent hashing, use **different host strings** per backend so each server occupies a distinct ring slot (same host twice would collide on one slot).
 
 ```yaml
 loadbalancer:
+  strategy: round-robin
   ips:
     - http://10.0.0.1:8080
     - http://10.0.0.2:8080
 ```
 
-At least one entry is required.
+Use **`strategy: consistent-hash`** for client-IP–sticky routing across backends.
+
+At least one **`ips`** entry is required.
