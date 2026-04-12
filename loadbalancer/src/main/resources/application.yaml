@@ -3,6 +3,8 @@ spring:
     name: loadbalancer
 
 loadbalancer:
+  consistent-hash:
+    virtual-nodes-per-server: 10
   strategy: round-robin
   ips:
     - http://127.0.0.1:8081

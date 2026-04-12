@@ -14,7 +14,12 @@ class LoadbalancerConfiguration {
 	@Bean
 	fun backendTargetSelector(properties: LoadbalancerProperties): BackendTargetSelector {
 		return when (properties.strategy) {
-			LoadBalancingStrategy.CONSISTENT_HASH -> ConsistentHashBackendSelector(ConsistentHashRing(properties.ips))
+			LoadBalancingStrategy.CONSISTENT_HASH -> ConsistentHashBackendSelector(
+				ConsistentHashRing(
+					properties.ips,
+					properties.consistentHash.virtualNodesPerServer,
+				),
+			)
 			LoadBalancingStrategy.ROUND_ROBIN -> RoundRobinTargetPicker(properties.ips)
 		}
 	}
