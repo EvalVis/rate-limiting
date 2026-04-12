@@ -7,6 +7,7 @@ import com.evalvis.ratelimiter.mediator.RateLimitMediator;
 import com.evalvis.ratelimiter.rate.IpRateLimiter;
 import com.evalvis.ratelimiter.rate.LeakyBucketRateLimiter;
 import com.evalvis.ratelimiter.rate.RateLimiter;
+import com.evalvis.ratelimiter.rate.RedisTokenBucketRateLimiter;
 import com.evalvis.ratelimiter.rate.TokenBucketRateLimiter;
 import com.evalvis.ratelimiter.selector.FixedRateLimiterSelector;
 import com.evalvis.ratelimiter.selector.JwtRoleRateLimiterSelector;
@@ -15,9 +16,11 @@ import java.time.Clock;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
@@ -31,8 +34,20 @@ public class RatelimiterConfiguration {
 
 	@Bean("rateLimiter")
 	@ConditionalOnMissingBean(RateLimiter.class)
-	public RateLimiter rateLimiter(RatelimiterProperties properties, Clock clock) {
+	@ConditionalOnProperty(name = "ratelimiter.redis.enabled", havingValue = "false", matchIfMissing = true)
+	public RateLimiter rateLimiterMemory(RatelimiterProperties properties, Clock clock) {
 		return rateLimiterFromSpec(properties.getRateLimit(), clock);
+	}
+
+	@Bean("rateLimiter")
+	@ConditionalOnMissingBean(RateLimiter.class)
+	@ConditionalOnProperty(name = "ratelimiter.redis.enabled", havingValue = "true")
+	public RateLimiter rateLimiterRedis(RatelimiterProperties properties, StringRedisTemplate ratelimiterStringRedisTemplate) {
+		var spec = properties.getRateLimit();
+		if (spec.getAlgorithm() != RatelimiterProperties.RateLimitAlgorithm.TOKEN_BUCKET) {
+			throw new IllegalStateException("ratelimiter.redis.enabled supports TOKEN_BUCKET only");
+		}
+		return new RedisTokenBucketRateLimiter(ratelimiterStringRedisTemplate, spec.getCapacity(), spec.getRefillPerSecond());
 	}
 
 	@Bean

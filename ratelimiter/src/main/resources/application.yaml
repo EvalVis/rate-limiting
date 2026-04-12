@@ -3,6 +3,8 @@ spring:
     name: ratelimiter
 
 ratelimiter:
+  redis:
+    enabled: false
   forward:
     host: 127.0.0.1
     port: 8081

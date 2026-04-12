@@ -9,6 +9,7 @@ public class RatelimiterProperties {
 	private RateLimit rateLimit = new RateLimit();
 	private RateLimit adminRateLimit = new RateLimit();
 	private Jwt jwt = new Jwt();
+	private Redis redis = new Redis();
 
 	public Forward getForward() {
 		return forward;
@@ -40,6 +41,14 @@ public class RatelimiterProperties {
 
 	public void setJwt(Jwt jwt) {
 		this.jwt = jwt;
+	}
+
+	public Redis getRedis() {
+		return redis;
+	}
+
+	public void setRedis(Redis redis) {
+		this.redis = redis;
 	}
 
 	public static class Forward {
@@ -113,6 +122,20 @@ public class RatelimiterProperties {
 	public enum RateLimitAlgorithm {
 		TOKEN_BUCKET,
 		LEAKY_BUCKET
+	}
+
+	public static class Redis {
+
+		private boolean enabled;
+
+		public boolean isEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
 	}
 
 	public static class Jwt {
