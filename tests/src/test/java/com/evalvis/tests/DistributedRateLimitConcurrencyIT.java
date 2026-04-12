@@ -166,11 +166,16 @@ class DistributedRateLimitConcurrencyIT {
 		CompletableFuture<HttpResponse<String>> first = httpClient.sendAsync(req1, HttpResponse.BodyHandlers.ofString());
 		Thread.sleep(200);
 		HttpResponse<String> second = httpClient.send(req2, HttpResponse.BodyHandlers.ofString());
-		HttpResponse<String> firstDone = first.join();
 
 		assertThat(second.statusCode())
 			.as("expected 429 when shared Redis bucket is empty; if both are 200, suspect distributed race or misconfiguration")
 			.isEqualTo(429);
+		assertThat(first.isDone())
+			.as(
+					"first request must still be in-flight when the second response is received; otherwise the toxiproxy DOWNSTREAM delay (%d ms) is not overlapping RL1's Redis round-trip and this is not a concurrency-overlap test",
+					LATENCY_MS)
+			.isFalse();
+		HttpResponse<String> firstDone = first.join();
 		assertThat(firstDone.statusCode()).isEqualTo(200);
 	}
 
