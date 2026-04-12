@@ -1,6 +1,10 @@
 spring:
   application:
     name: ratelimiter
+  data:
+    redis:
+      repositories:
+        enabled: false
 
 ratelimiter:
   redis:
