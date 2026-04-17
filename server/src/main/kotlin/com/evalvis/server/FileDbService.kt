@@ -1,36 +1,46 @@
 package com.evalvis.server
 
-import com.evalvis.database.FileDb
+import com.evalvis.database.FileDbClient
 import com.evalvis.database.TableNotFoundException
+import com.evalvis.database.TcpFileDbClient
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import java.nio.file.Path
 import java.util.Optional
 
 @Service
 class FileDbService(
-    @Value("\${filedb.root-dir:#{null}}")
-    rootDir: String?
+    @Value("\${database.url:127.0.0.1:7379}")
+    databaseUrl: String
 ) {
-    private val fileDb = if (rootDir.isNullOrBlank()) {
-        FileDb()
-    } else {
-        FileDb(Path.of(rootDir))
-    }
+    private val client: FileDbClient = createClient(databaseUrl)
 
     fun createTable(tableName: String) {
-        fileDb.createTable(tableName)
+        execute { client.createTable(tableName) }
     }
 
     fun put(tableName: String, key: String, value: String) {
-        fileDb.put(tableName, key, value)
+        execute { client.put(tableName, key, value) }
     }
 
     fun get(tableName: String, key: String): Optional<String> {
-        return try {
-            fileDb.get(tableName, key)
+        return execute { client.get(tableName, key) }
+    }
+
+    private fun createClient(databaseUrl: String): FileDbClient {
+        val tokens = databaseUrl.split(":", limit = 2)
+        if (tokens.size != 2) {
+            throw IllegalArgumentException("database.url must be in host:port format")
+        }
+        return TcpFileDbClient(tokens[0], tokens[1].toInt())
+    }
+
+    private fun <T> execute(action: () -> T): T {
+        try {
+            return action()
         } catch (_: TableNotFoundException) {
-            Optional.empty()
+            throw com.evalvis.server.TableNotFoundException()
+        } catch (exception: Exception) {
+            throw DatabaseClientException("Database unavailable")
         }
     }
 }

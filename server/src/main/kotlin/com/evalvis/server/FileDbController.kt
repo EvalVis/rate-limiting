@@ -1,6 +1,5 @@
 package com.evalvis.server
 
-import com.evalvis.database.TableNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -41,5 +40,10 @@ class FileDbController(
     @ExceptionHandler(TableNotFoundException::class)
     fun onTableNotFound(): ResponseEntity<Unit> {
         return ResponseEntity.notFound().build()
+    }
+
+    @ExceptionHandler(DatabaseClientException::class)
+    fun onDatabaseUnavailable(): ResponseEntity<Unit> {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build()
     }
 }

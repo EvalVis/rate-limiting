@@ -1,6 +1,6 @@
 # FileDB
 
-`database` is an in-process key-value library with file persistence.
+`database` is a standalone TCP key-value server with file persistence.
 
 ## Storage
 
@@ -9,17 +9,27 @@
 - Each write appends a JSON line record with `key` and `value`
 - Reads scan from bottom to top to return the latest value for a key
 
-## API
+## TCP Commands
 
-- `createTable(tableName)`
-- `put(tableName, key, value)`
-- `get(tableName, key)`
+- `CREATE_TABLE <tableName>`
+- `PUT <tableName> <key> <value>`
+- `GET <tableName> <key>`
+
+## Responses
+
+- `OK`
+- `VALUE <value>`
+- `NOT_FOUND`
+- `ERROR table_not_found`
+- `ERROR invalid_command`
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-  caller[ApplicationCode] --> fileDb[FileDbFacade]
+  caller[ApplicationCode] --> tcpServer[FileDbTcpServer]
+  tcpServer --> commandProcessor[FileDbCommandProcessor]
+  commandProcessor --> fileDb[FileDb]
   fileDb --> validator[NameAndKeyValidation]
   fileDb --> tableRepo[TableFileRepository]
   tableRepo --> rootDir[userHome_filedb]

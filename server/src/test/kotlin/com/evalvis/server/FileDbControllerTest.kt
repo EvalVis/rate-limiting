@@ -1,5 +1,8 @@
 package com.evalvis.server
 
+import com.evalvis.database.FileDbTcpServer
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -59,12 +62,26 @@ class FileDbControllerTest {
 
     companion object {
         @JvmStatic
-        private val tempDir = Files.createTempDirectory("filedb-server-test")
+        private lateinit var fileDbTcpServer: FileDbTcpServer
+
+        @JvmStatic
+        @BeforeAll
+        fun startServer() {
+            val tempDir = Files.createTempDirectory("database-integration-test")
+            fileDbTcpServer = FileDbTcpServer(0, tempDir)
+            fileDbTcpServer.start()
+        }
+
+        @JvmStatic
+        @AfterAll
+        fun stopServer() {
+            fileDbTcpServer.close()
+        }
 
         @JvmStatic
         @DynamicPropertySource
         fun properties(registry: DynamicPropertyRegistry) {
-            registry.add("filedb.root-dir") { tempDir.toString() }
+            registry.add("database.url") { "127.0.0.1:${fileDbTcpServer.port()}" }
         }
     }
 }
