@@ -3,3 +3,6 @@ spring:
     name: server
 database:
   url: 127.0.0.1:7379
+  leader-discovery:
+    election-endpoints: ""
+    cache-ttl-ms: 5000

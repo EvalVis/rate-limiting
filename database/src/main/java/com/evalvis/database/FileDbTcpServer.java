@@ -14,18 +14,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class FileDbTcpServer implements AutoCloseable {
     private final ServerSocket serverSocket;
-    private final FileDbCommandProcessor commandProcessor;
+    private final CommandProcessor commandProcessor;
     private final ExecutorService clientExecutor;
     private final AtomicBoolean running;
     private Thread acceptThread;
 
     public FileDbTcpServer(int port, Path rootDirectory) {
+        this(port, new FileDbCommandProcessor(new FileDb(rootDirectory)));
+    }
+
+    public FileDbTcpServer(int port, CommandProcessor commandProcessor) {
         try {
             this.serverSocket = new ServerSocket(port);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to open server socket", exception);
         }
-        this.commandProcessor = new FileDbCommandProcessor(new FileDb(rootDirectory));
+        this.commandProcessor = commandProcessor;
         this.clientExecutor = Executors.newCachedThreadPool();
         this.running = new AtomicBoolean(false);
     }

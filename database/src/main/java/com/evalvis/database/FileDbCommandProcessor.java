@@ -2,14 +2,15 @@ package com.evalvis.database;
 
 import java.util.Optional;
 
-final class FileDbCommandProcessor {
+final class FileDbCommandProcessor implements CommandProcessor {
     private final FileDb fileDb;
 
     FileDbCommandProcessor(FileDb fileDb) {
         this.fileDb = fileDb;
     }
 
-    String process(String commandLine) {
+    @Override
+    public String process(String commandLine) {
         if (commandLine == null || commandLine.isBlank()) {
             return "ERROR invalid_command";
         }

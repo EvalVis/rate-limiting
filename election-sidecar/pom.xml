@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.evalvis</groupId>
-    <artifactId>database</artifactId>
+    <artifactId>election-sidecar</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>database</name>
+    <name>election-sidecar</name>
 
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
@@ -19,6 +19,12 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.evalvis</groupId>
+            <artifactId>database</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -38,7 +44,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.evalvis.database.FileDbServerApplication</mainClass>
+                            <mainClass>com.evalvis.sidecar.ElectionSidecarApplication</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

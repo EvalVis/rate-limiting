@@ -9,38 +9,56 @@ import java.util.Optional
 
 @Service
 class FileDbService(
-    @Value("\${database.url:127.0.0.1:7379}")
-    databaseUrl: String
+    @Value("\${database.url:127.0.0.1:7379}") private val readDbUrl: String,
+    @Value("\${database.leader-discovery.election-endpoints:}") electionEndpointsRaw: String,
+    @Value("\${database.leader-discovery.cache-ttl-ms:5000}") cacheTtlMs: Long
 ) {
-    private val client: FileDbClient = createClient(databaseUrl)
+    private val leaderDiscovery: LeaderDiscoveryClient? =
+        electionEndpointsRaw.trim()
+            .takeIf { it.isNotBlank() }
+            ?.let { raw -> LeaderDiscoveryClient(raw.split(",").map { it.trim() }, cacheTtlMs) }
 
     fun createTable(tableName: String) {
-        execute { client.createTable(tableName) }
+        executeWrite { it.createTable(tableName) }
     }
 
     fun put(tableName: String, key: String, value: String) {
-        execute { client.put(tableName, key, value) }
+        executeWrite { it.put(tableName, key, value) }
     }
 
     fun get(tableName: String, key: String): Optional<String> {
-        return execute { client.get(tableName, key) }
+        return executeRead { it.get(tableName, key) }
     }
 
-    private fun createClient(databaseUrl: String): FileDbClient {
-        val tokens = databaseUrl.split(":", limit = 2)
-        if (tokens.size != 2) {
-            throw IllegalArgumentException("database.url must be in host:port format")
+    private fun <T> executeWrite(action: (FileDbClient) -> T): T {
+        try {
+            return execute { action(writeClient()) }
+        } catch (e: DatabaseClientException) {
+            leaderDiscovery?.invalidate()
+            return execute { action(writeClient()) }
         }
-        return TcpFileDbClient(tokens[0], tokens[1].toInt())
     }
+
+    private fun <T> executeRead(action: (FileDbClient) -> T): T {
+        return execute { action(createClient(readDbUrl)) }
+    }
+
+    private fun writeClient(): FileDbClient =
+        createClient(leaderDiscovery?.findLeaderDbAddress() ?: readDbUrl)
 
     private fun <T> execute(action: () -> T): T {
         try {
             return action()
         } catch (_: TableNotFoundException) {
             throw com.evalvis.server.TableNotFoundException()
-        } catch (exception: Exception) {
+        } catch (_: Exception) {
             throw DatabaseClientException("Database unavailable")
         }
+    }
+
+    private fun createClient(url: String): FileDbClient {
+        val tokens = url.split(":", limit = 2)
+        require(tokens.size == 2) { "database url must be host:port, got: $url" }
+        return TcpFileDbClient(tokens[0], tokens[1].toInt())
     }
 }

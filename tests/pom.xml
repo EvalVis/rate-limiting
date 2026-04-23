@@ -78,7 +78,10 @@
 					<includes>
 						<include>**/*IT.java</include>
 					</includes>
-					<argLine>--add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+					<argLine>--add-opens java.base/java.lang=ALL-UNNAMED -Dapi.version=1.47</argLine>
+					<environmentVariables>
+						<DOCKER_HOST>npipe:////./pipe/docker_engine_linux</DOCKER_HOST>
+					</environmentVariables>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -91,12 +94,15 @@
 						<phase>pre-integration-test</phase>
 						<configuration>
 							<target>
-								<fail message="Build ratelimiter and server first: mvn -f ../ratelimiter/pom.xml package; mvn -f ../server/pom.xml package">
+								<fail message="Build required modules first: mvn -f ../database/pom.xml package; mvn -f ../election-sidecar/pom.xml package; mvn -f ../ratelimiter/pom.xml package; mvn -f ../server/pom.xml package; mvn -f ../loadbalancer/pom.xml package">
 									<condition>
 										<not>
 											<and>
+												<available file="${project.basedir}/../database/target/database-0.0.1-SNAPSHOT.jar"/>
+												<available file="${project.basedir}/../election-sidecar/target/election-sidecar-0.0.1-SNAPSHOT.jar"/>
 												<available file="${project.basedir}/../ratelimiter/target/ratelimiter-0.0.1-SNAPSHOT.jar"/>
 												<available file="${project.basedir}/../server/target/server-0.0.1-SNAPSHOT.jar"/>
+												<available file="${project.basedir}/../loadbalancer/target/loadbalancer-0.0.1-SNAPSHOT.jar"/>
 											</and>
 										</not>
 									</condition>
