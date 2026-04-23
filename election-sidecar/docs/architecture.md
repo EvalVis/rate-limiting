@@ -111,6 +111,50 @@ When called by a leader proxy, fires HTTP `POST /replicate` to every peer sideca
 
 ---
 
+## How the Server Discovers the Leader
+
+The sidecar exposes `/status` not only for peer coordination but also as the discovery endpoint for stateless servers. Every `/status` response — from any node, leader or follower — includes the current leader's TCP address:
+
+```json
+{
+  "leaderHost": "db3",
+  "leaderDbPort": 7379
+}
+```
+
+The server module's `LeaderDiscoveryClient` uses these fields to route writes:
+
+```mermaid
+flowchart TD
+    Write["FileDbService.executeWrite()"]
+
+    Write --> Cache{leaderCache\nvalid?}
+    Cache -->|hit| Send["write to cached\nleader TCP address"]
+    Cache -->|miss / expired| Poll["GET /status on each\nconfigured sidecar endpoint\nstop at first success"]
+    Poll --> Store["cache leaderHost:leaderDbPort\nfor cache-ttl-ms\ndefault 5 000 ms"]
+    Store --> Send
+
+    Send --> OK{success?}
+    OK -->|yes| Done["return result"]
+    OK -->|no| Inv["invalidate cache"]
+    Inv --> Poll
+```
+
+**Reads are never routed through discovery.** The server is configured with a static `DATABASE_URL` pointing to its co-located sidecar proxy. Because every sidecar replica receives all writes via `/replicate`, reads from any node return consistent data.
+
+### IP Change on Leader Death
+
+When the leader dies the server's cached address becomes stale. The server detects this on the next write attempt:
+
+1. **Write fails** — TCP connection to the dead leader is refused → `DatabaseClientException`
+2. **Cache invalidated** — `leaderDiscovery.invalidate()` clears the cached address immediately
+3. **Re-discover** — `LeaderDiscoveryClient` polls `/status` on each configured sidecar in order; the first live sidecar responds with the new leader's coordinates (the new leader has already been elected by the time the write fails, because the sidecar heartbeat timeout of ~1 150 ms elapses before the server's first retry)
+4. **Write retried** — the write is sent to the new leader's address and succeeds
+
+The server makes exactly one retry per write. If the second attempt also fails, the exception propagates to the caller. The re-discovered address is cached for the full TTL, so all subsequent writes within that window reach the new leader without another `/status` poll.
+
+---
+
 ## Startup Order
 
 ```mermaid
