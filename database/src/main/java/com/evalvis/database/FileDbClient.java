@@ -10,4 +10,6 @@ public interface FileDbClient {
     Optional<String> get(String tableName, String key);
 
     java.util.Map<String, String> listAll(String tableName);
+
+    java.util.List<String> listTables();
 }

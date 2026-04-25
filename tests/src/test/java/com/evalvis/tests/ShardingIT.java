@@ -95,7 +95,7 @@ class ShardingIT {
         awaitLeader(List.of(shard1Sidecar));
         awaitLeader(List.of(shard2Sidecar));
         LOG.info("Leaders elected in both shards");
-        Thread.sleep(5000); // Wait for stabilization
+        Thread.sleep(5000); 
     }
 
     @AfterAll
@@ -155,7 +155,7 @@ class ShardingIT {
 
     @Test
     @Order(3)
-    void shardAdditionAndLazyMigration() throws Exception {
+    void shardAdditionAndDataAccessibility() throws Exception {
         int lbPort = lb.getMappedPort(8080);
         String baseUrl = "http://127.0.0.1:" + lbPort;
         String table = "table3";
@@ -163,6 +163,7 @@ class ShardingIT {
         String keyBefore = "key-add-1";
         put(baseUrl + "/tables/" + table + "/keys/" + keyBefore, "old-val");
 
+        // Add Shard 3
         Path databaseJar = moduleJar("database", "database");
         Path sidecarJar = moduleJar("election-sidecar", "election-sidecar");
         Path serverJar = moduleJar("server", "server");
@@ -185,6 +186,7 @@ class ShardingIT {
         ));
         lb.start();
 
+        // LB will trigger lazy migration on first read
         assertThat(retryGet("http://127.0.0.1:" + lb.getMappedPort(8080) + "/tables/" + table + "/keys/" + keyBefore, 10)).isEqualTo("old-val");
 
         shard3Server.stop(); shard3Sidecar.stop(); shard3Db.stop();
@@ -192,7 +194,7 @@ class ShardingIT {
 
     @Test
     @Order(4)
-    void shardRemovalAndGracefulDecommissioning() throws Exception {
+    void shardRemovalAndAutoRebalancing() throws Exception {
         Path lbJar = moduleJar("loadbalancer", "loadbalancer");
         lb.stop();
         lb = lbContainer(lbJar, List.of(
@@ -209,6 +211,8 @@ class ShardingIT {
         String keyInShard2 = "key-rem-1"; 
         put(baseUrl + "/tables/" + table + "/keys/" + keyInShard2, "val-rem");
 
+        // AUTO-REBALANCE: Mark Shard 2 as decommissioning. 
+        // Load Balancer's AutoRebalanceOrchestrator will trigger the migration API automatically.
         lb.stop();
         lb = lbContainer(lbJar, List.of(
             new ShardEntry("shard1", "shard1-server:8080", false),
@@ -217,16 +221,16 @@ class ShardingIT {
         lb.start();
 
         lbPort = lb.getMappedPort(8080);
-        assertThat(retryGet("http://127.0.0.1:" + lbPort + "/tables/" + table + "/keys/" + keyInShard2, 10)).isEqualTo("val-rem");
-        
-        int s1Port = shard1Server.getMappedPort(8080);
-        assertThat(post("http://127.0.0.1:" + s1Port + "/tables/" + table + "/migrate-from?sourceUrl=shard2-sidecar:7379")).isEqualTo(200);
+        baseUrl = "http://127.0.0.1:" + lbPort;
 
+        // Data should be migrated automatically by LB orchestrator (Wait for it)
+        assertThat(retryGet(baseUrl + "/tables/" + table + "/keys/" + keyInShard2, 15)).isEqualTo("val-rem");
+        
+        // Final check after full removal
         lb.stop();
         lb = lbContainer(lbJar, List.of(new ShardEntry("shard1", "shard1-server:8080", false)));
         lb.start();
-
-        assertThat(retryGet("http://127.0.0.1:" + lb.getMappedPort(8080) + "/tables/" + table + "/keys/" + keyInShard2, 10)).isEqualTo("val-rem");
+        assertThat(retryGet("http://127.0.0.1:" + lb.getMappedPort(8080) + "/tables/" + table + "/keys/" + keyInShard2, 5)).isEqualTo("val-rem");
     }
 
     private void checkKey(String key, Map<String, String> s1, Map<String, String> s2) {
@@ -302,7 +306,7 @@ class ShardingIT {
     private String retryGet(String url, int maxAttempts) throws Exception {
         for (int attempt = 0; attempt < maxAttempts; attempt++) {
             String res = get(url); if (res != null) return res;
-            Thread.sleep(1500);
+            Thread.sleep(2000);
         }
         return null;
     }

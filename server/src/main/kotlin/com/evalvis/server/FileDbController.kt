@@ -16,6 +16,11 @@ class FileDbController(
         return ResponseEntity.status(HttpStatus.CREATED).build()
     }
 
+    @GetMapping
+    fun listTables(): ResponseEntity<List<String>> {
+        return ResponseEntity.ok(fileDbService.listTables())
+    }
+
     @PutMapping("/{tableName}/keys/{key}")
     fun put(
         @PathVariable tableName: String,

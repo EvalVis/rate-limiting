@@ -64,6 +64,15 @@ public final class TcpFileDbClient implements FileDbClient {
         return result;
     }
 
+    @Override
+    public java.util.List<String> listTables() {
+        String response = send("LIST_TABLES");
+        if (response.startsWith("TABLES ")) {
+            return java.util.Arrays.asList(response.substring("TABLES ".length()).split("\\s+"));
+        }
+        return java.util.Collections.emptyList();
+    }
+
     private void requireOk(String response, String tableName) {
         if ("OK".equals(response)) {
             return;

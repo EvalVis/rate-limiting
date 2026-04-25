@@ -26,7 +26,16 @@ final class FileDbCommandProcessor implements CommandProcessor {
         if (commandLine.startsWith("LIST_ALL ")) {
             return listAll(commandLine);
         }
+        if (commandLine.equals("LIST_TABLES")) {
+            return listTables();
+        }
         return "ERROR invalid_command";
+    }
+
+    private String listTables() {
+        java.util.List<String> tables = fileDb.listTables();
+        if (tables.isEmpty()) return "EMPTY";
+        return "TABLES " + String.join(" ", tables);
     }
 
     private String listAll(String commandLine) {

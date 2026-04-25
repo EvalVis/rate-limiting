@@ -59,6 +59,17 @@ final class TableFileRepository {
         }
     }
 
+    java.util.List<String> listTables() {
+        try {
+            return Files.list(rootDirectory)
+                .filter(p -> p.toString().endsWith(".jsonl"))
+                .map(p -> p.getFileName().toString().replace(".jsonl", ""))
+                .collect(java.util.stream.Collectors.toList());
+        } catch (IOException e) {
+            return java.util.Collections.emptyList();
+        }
+    }
+
     java.util.Map<String, String> findAll(String tableName) {
         Path tablePath = tablePath(tableName);
         if (!Files.exists(tablePath)) {

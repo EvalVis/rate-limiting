@@ -38,6 +38,10 @@ public final class FileDb {
         return tableFileRepository.findAll(tableName);
     }
 
+    public java.util.List<String> listTables() {
+        return tableFileRepository.listTables();
+    }
+
     private void validateValue(String fieldName, String value) {
         Objects.requireNonNull(value, fieldName + " must not be null");
         if (value.isBlank()) {
