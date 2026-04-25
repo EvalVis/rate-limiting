@@ -33,6 +33,11 @@ public final class FileDb {
         return tableFileRepository.find(tableName, key);
     }
 
+    public java.util.Map<String, String> findAll(String tableName) {
+        validateValue("tableName", tableName);
+        return tableFileRepository.findAll(tableName);
+    }
+
     private void validateValue(String fieldName, String value) {
         Objects.requireNonNull(value, fieldName + " must not be null");
         if (value.isBlank()) {

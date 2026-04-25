@@ -38,13 +38,60 @@ class ProxyController(
 	fun proxy(request: HttpServletRequest): ResponseEntity<ByteArray> {
 		val relativeUri = buildRelativeUri(request)
 		val method = HttpMethod.valueOf(request.method)
-		val targetUri = resolveTargetUri(backendTargetSelector.selectTarget(request), relativeUri)
-		return forwardWebClient.method(method)
-			.uri(targetUri)
-			.headers { copyRequestHeaders(request, it) }
-			.body(BodyInserters.fromResource(InputStreamResource(request.inputStream)))
-			.exchangeToMono { toResponseEntity(it) }
-			.block()!!
+
+		if (backendTargetSelector.isBroadcast(request)) {
+			val targets = backendTargetSelector.selectTargets(request)
+			val body = request.inputStream.readAllBytes()
+			val responses = targets.map { baseUrl ->
+				val targetUri = resolveTargetUri(baseUrl, relativeUri)
+				forwardWebClient.method(method)
+					.uri(targetUri)
+					.headers { copyRequestHeaders(request, it) }
+					.bodyValue(body)
+					.exchangeToMono { toResponseEntity(it) }
+			}
+			return Mono.zip(responses) { it.first() as ResponseEntity<ByteArray> }
+				.block()!!
+		} else {
+			val primaryTarget = backendTargetSelector.selectTarget(request)
+			val targetUri = resolveTargetUri(primaryTarget, relativeUri)
+			
+			// We might need the body multiple times for fallback, but only for GET it's usually empty.
+			// However, let's keep it simple for now.
+			
+			val response = forwardWebClient.method(method)
+				.uri(targetUri)
+				.headers { copyRequestHeaders(request, it) }
+				.body(BodyInserters.fromResource(InputStreamResource(request.inputStream)))
+				.exchangeToMono { toResponseEntity(it) }
+				.block()!!
+
+			if (response.statusCode.value() == 404) {
+				val fallbackTarget = backendTargetSelector.selectFallbackTarget(request)
+				if (fallbackTarget != null) {
+					val fallbackUri = resolveTargetUri(fallbackTarget, relativeUri)
+					val fallbackResponse = forwardWebClient.method(method)
+						.uri(fallbackUri)
+						.headers { copyRequestHeaders(request, it) }
+						.exchangeToMono { toResponseEntity(it) }
+						.block()!!
+
+					if (fallbackResponse.statusCode.is2xxSuccessful && fallbackResponse.body != null) {
+						// Lazy Migration: write to primary target asynchronously
+						val primaryUri = resolveTargetUri(primaryTarget, relativeUri)
+						forwardWebClient.put()
+							.uri(primaryUri)
+							.headers { copyRequestHeaders(request, it) }
+							.bodyValue(fallbackResponse.body!!)
+							.retrieve()
+							.toBodilessEntity()
+							.subscribe() 
+					}
+					return fallbackResponse
+				}
+			}
+			return response
+		}
 	}
 
 	private fun resolveTargetUri(base: String, relativeUri: String): URI {

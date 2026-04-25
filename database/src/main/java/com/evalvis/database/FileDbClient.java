@@ -8,4 +8,6 @@ public interface FileDbClient {
     void put(String tableName, String key, String value);
 
     Optional<String> get(String tableName, String key);
+
+    java.util.Map<String, String> listAll(String tableName);
 }

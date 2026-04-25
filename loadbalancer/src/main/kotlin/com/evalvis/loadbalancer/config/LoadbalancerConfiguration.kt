@@ -1,9 +1,6 @@
 package com.evalvis.loadbalancer.config
 
-import com.evalvis.loadbalancer.balance.BackendTargetSelector
-import com.evalvis.loadbalancer.balance.ConsistentHashBackendSelector
-import com.evalvis.loadbalancer.balance.ConsistentHashRing
-import com.evalvis.loadbalancer.balance.RoundRobinTargetPicker
+import com.evalvis.loadbalancer.balance.*
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.reactive.function.client.WebClient
@@ -21,6 +18,11 @@ class LoadbalancerConfiguration {
 				),
 			)
 			LoadBalancingStrategy.ROUND_ROBIN -> RoundRobinTargetPicker(properties.ips)
+			LoadBalancingStrategy.SHARDING_CONSISTENT_HASH -> {
+				val shards = properties.shards.map { Shard(it.id, it.backends, it.decommissioning) }
+				val ring = ShardRing(shards, properties.sharding.virtualNodesPerShard)
+				ShardingBackendSelector(ring, properties.sharding.pathPattern)
+			}
 		}
 	}
 

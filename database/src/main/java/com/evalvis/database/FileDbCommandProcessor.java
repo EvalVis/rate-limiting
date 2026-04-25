@@ -23,7 +23,25 @@ final class FileDbCommandProcessor implements CommandProcessor {
         if (commandLine.startsWith("GET ")) {
             return get(commandLine);
         }
+        if (commandLine.startsWith("LIST_ALL ")) {
+            return listAll(commandLine);
+        }
         return "ERROR invalid_command";
+    }
+
+    private String listAll(String commandLine) {
+        String[] tokens = commandLine.trim().split("\\s+");
+        if (tokens.length != 2) {
+            return "ERROR invalid_command";
+        }
+        try {
+            java.util.Map<String, String> all = fileDb.findAll(tokens[1]);
+            StringBuilder sb = new StringBuilder("DATA ");
+            all.forEach((k, v) -> sb.append(k).append(":").append(v).append(" "));
+            return sb.toString().trim();
+        } catch (TableNotFoundException exception) {
+            return "ERROR table_not_found";
+        }
     }
 
     private String createTable(String commandLine) {

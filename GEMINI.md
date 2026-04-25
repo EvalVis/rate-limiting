@@ -67,7 +67,11 @@ docker.host=npipe:////./pipe/docker_engine_linux
 | `ratelimiter` | Rate limiting service with support for token/leaky bucket and JWT roles. |
 | `tests` | Comprehensive integration tests using Testcontainers. |
 
-## Development Conventions
+## Development Workflow (Sharding Task)
+For the implementation of database sharding, the following workflow is mandatory:
+1. **Documentation Phase**: Create class and sequence diagrams in the `docs/` folder to align on architecture before coding.
+2. **Test Phase (TDD)**: Write failing unit and integration tests that define the expected sharding behavior.
+3. **Execution Phase**: Implement the logic to satisfy the tests, adhering to the documented design.
 
 ### Coding Style
 - **Abstractions:** Heavy use of `@FunctionalInterface` for core logic (e.g., `LeaderState`, `Replicator`, `BackendTargetSelector`).

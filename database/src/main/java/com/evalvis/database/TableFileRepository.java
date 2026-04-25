@@ -59,6 +59,24 @@ final class TableFileRepository {
         }
     }
 
+    java.util.Map<String, String> findAll(String tableName) {
+        Path tablePath = tablePath(tableName);
+        if (!Files.exists(tablePath)) {
+            throw new TableNotFoundException(tableName);
+        }
+        try {
+            List<String> lines = Files.readAllLines(tablePath);
+            java.util.Map<String, String> results = new java.util.HashMap<>();
+            for (String line : lines) {
+                Optional<JsonLineRecord> parsed = JsonLineCodec.decode(line);
+                parsed.ifPresent(record -> results.put(record.key(), record.value()));
+            }
+            return results;
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to read table " + tableName, exception);
+        }
+    }
+
     private Path tablePath(String tableName) {
         return rootDirectory.resolve(tableName + ".jsonl");
     }

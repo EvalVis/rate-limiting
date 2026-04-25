@@ -44,6 +44,26 @@ public final class TcpFileDbClient implements FileDbClient {
         throw new IllegalStateException("Unexpected database response: " + response);
     }
 
+    @Override
+    public java.util.Map<String, String> listAll(String tableName) {
+        String response = send("LIST_ALL " + tableName);
+        if ("ERROR table_not_found".equals(response)) {
+            throw new TableNotFoundException(tableName);
+        }
+        java.util.Map<String, String> result = new java.util.HashMap<>();
+        if (response.startsWith("DATA ")) {
+            String data = response.substring("DATA ".length());
+            String[] pairs = data.split("\\s+");
+            for (String pair : pairs) {
+                String[] kv = pair.split(":", 2);
+                if (kv.length == 2) {
+                    result.put(kv[0], kv[1]);
+                }
+            }
+        }
+        return result;
+    }
+
     private void requireOk(String response, String tableName) {
         if ("OK".equals(response)) {
             return;
@@ -55,6 +75,7 @@ public final class TcpFileDbClient implements FileDbClient {
     }
 
     private String send(String command) {
+        System.out.println("Sending to DB [" + host + ":" + port + "]: " + command);
         try (Socket socket = new Socket(host, port);
              BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
              BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
@@ -62,11 +83,13 @@ public final class TcpFileDbClient implements FileDbClient {
             writer.newLine();
             writer.flush();
             String response = reader.readLine();
+            System.out.println("Received from DB [" + host + ":" + port + "]: " + response);
             if (response == null) {
                 throw new IllegalStateException("Empty database response");
             }
             return response;
         } catch (IOException exception) {
+            System.err.println("DB Error: " + exception.getMessage());
             throw new IllegalStateException("Database unavailable", exception);
         }
     }
