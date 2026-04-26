@@ -14,30 +14,54 @@ class LeaderDiscoveryClient(
         .connectTimeout(Duration.ofSeconds(2))
         .build()
 
-    @Volatile private var cached: Pair<String, Long>? = null
+    @Volatile private var cachedLeader: Pair<String, Long>? = null
+    @Volatile private var cachedNodes: Pair<List<String>, Long>? = null
 
     fun findLeaderDbAddress(): String {
         val now = System.currentTimeMillis()
-        cached?.let { (addr, exp) -> if (now < exp) return addr }
+        cachedLeader?.let { (addr, exp) -> if (now < exp) return addr }
 
+        val status = fetchAnyStatus()
+        val host = status["leaderHost"]?.takeIf { it.isNotBlank() } ?: throw IllegalStateException("No leader host found")
+        val port = status["leaderDbPort"]?.takeIf { it.isNotBlank() && it != "0" } ?: throw IllegalStateException("No leader port found")
+        val addr = "$host:$port"
+        cachedLeader = addr to (now + cacheTtlMs)
+        return addr
+    }
+
+    fun findAllProxyAddresses(): List<String> {
+        val now = System.currentTimeMillis()
+        cachedNodes?.let { (nodes, exp) -> if (now < exp) return nodes }
+
+        val nodes = mutableListOf<String>()
         for (endpoint in electionEndpoints) {
             runCatching { fetchStatus(endpoint) }
                 .getOrNull()
-                ?.let { status ->
-                    val host = status["leaderHost"]?.takeIf { it.isNotBlank() } ?: return@let null
-                    val port = status["leaderDbPort"]?.takeIf { it.isNotBlank() && it != "0" } ?: return@let null
-                    "$host:$port"
-                }
-                ?.also { addr ->
-                    cached = addr to (now + cacheTtlMs)
-                    return addr
+                ?.let { s ->
+                    val host = s["selfHost"] ?: return@let
+                    val port = s["selfDbPort"] ?: return@let
+                    nodes.add("$host:$port")
                 }
         }
-        throw IllegalStateException("No leader found from election endpoints: $electionEndpoints")
+        
+        if (nodes.isEmpty()) throw IllegalStateException("No proxy nodes found")
+        
+        cachedNodes = nodes to (now + cacheTtlMs)
+        return nodes
     }
 
     fun invalidate() {
-        cached = null
+        cachedLeader = null
+        cachedNodes = null
+    }
+
+    private fun fetchAnyStatus(): Map<String, String> {
+        for (endpoint in electionEndpoints) {
+            runCatching { fetchStatus(endpoint) }
+                .getOrNull()
+                ?.let { return it }
+        }
+        throw IllegalStateException("Could not reach any election endpoint: $electionEndpoints")
     }
 
     private fun fetchStatus(endpoint: String): Map<String, String> {

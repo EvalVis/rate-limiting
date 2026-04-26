@@ -33,7 +33,7 @@ class DistributedRateLimitConcurrencyIT {
 
 	private static final int REDIS_PROXY_LISTEN_PORT = 8666;
 
-	private static final int LATENCY_MS = 5000;
+	private static final int LATENCY_MS = 7000;
 
 	private static final Duration STARTUP_TIMEOUT = Duration.ofMinutes(2);
 
@@ -79,7 +79,7 @@ class DistributedRateLimitConcurrencyIT {
 		redisProxy = toxiproxyClient.createProxy("redis", "0.0.0.0:" + REDIS_PROXY_LISTEN_PORT, "redis:6379");
 		redisProxy.toxics().latency("down", ToxicDirection.DOWNSTREAM, LATENCY_MS);
 
-		server = new GenericContainer<>(DockerImageName.parse("eclipse-temurin:24-jre"))
+		server = new GenericContainer<>(DockerImageName.parse("eclipse-temurin:25-jre"))
 			.withNetwork(network)
 			.withNetworkAliases("server")
 			.withEnv("SERVER_PORT", "8082")

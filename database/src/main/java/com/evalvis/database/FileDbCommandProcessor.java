@@ -20,8 +20,14 @@ final class FileDbCommandProcessor implements CommandProcessor {
         if (commandLine.startsWith("PUT ")) {
             return put(commandLine);
         }
+        if (commandLine.startsWith("PUT_V ")) {
+            return putVersioned(commandLine);
+        }
         if (commandLine.startsWith("GET ")) {
             return get(commandLine);
+        }
+        if (commandLine.startsWith("GET_V ")) {
+            return getVersioned(commandLine);
         }
         if (commandLine.startsWith("LIST_ALL ")) {
             return listAll(commandLine);
@@ -75,6 +81,23 @@ final class FileDbCommandProcessor implements CommandProcessor {
         }
     }
 
+    private String putVersioned(String commandLine) {
+        // PUT_V <tableName> <key> <version> <value>
+        String[] tokens = commandLine.split("\\s+", 5);
+        if (tokens.length != 5) {
+            return "ERROR invalid_command";
+        }
+        try {
+            long version = Long.parseLong(tokens[3]);
+            fileDb.put(tokens[1], tokens[2], tokens[4], version);
+            return "OK";
+        } catch (NumberFormatException e) {
+            return "ERROR invalid_version";
+        } catch (TableNotFoundException exception) {
+            return "ERROR table_not_found";
+        }
+    }
+
     private String get(String commandLine) {
         String[] tokens = commandLine.trim().split("\\s+");
         if (tokens.length != 3) {
@@ -83,6 +106,20 @@ final class FileDbCommandProcessor implements CommandProcessor {
         try {
             Optional<String> value = fileDb.get(tokens[1], tokens[2]);
             return value.map(current -> "VALUE " + current).orElse("NOT_FOUND");
+        } catch (TableNotFoundException exception) {
+            return "ERROR table_not_found";
+        }
+    }
+
+    private String getVersioned(String commandLine) {
+        // GET_V <tableName> <key>
+        String[] tokens = commandLine.trim().split("\\s+");
+        if (tokens.length != 3) {
+            return "ERROR invalid_command";
+        }
+        try {
+            Optional<JsonLineRecord> record = fileDb.getRecord(tokens[1], tokens[2]);
+            return record.map(r -> "VALUE_V " + r.version() + " " + r.value()).orElse("NOT_FOUND");
         } catch (TableNotFoundException exception) {
             return "ERROR table_not_found";
         }

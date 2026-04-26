@@ -21,16 +21,24 @@ public final class FileDb {
     }
 
     public void put(String tableName, String key, String value) {
+        put(tableName, key, value, 0L);
+    }
+
+    public void put(String tableName, String key, String value, long version) {
         validateValue("tableName", tableName);
         validateValue("key", key);
         Objects.requireNonNull(value, "value must not be null");
-        tableFileRepository.append(tableName, key, value);
+        tableFileRepository.append(tableName, key, value, version);
     }
 
     public Optional<String> get(String tableName, String key) {
+        return getRecord(tableName, key).map(JsonLineRecord::value);
+    }
+
+    public Optional<JsonLineRecord> getRecord(String tableName, String key) {
         validateValue("tableName", tableName);
         validateValue("key", key);
-        return tableFileRepository.find(tableName, key);
+        return tableFileRepository.findRecord(tableName, key);
     }
 
     public java.util.Map<String, String> findAll(String tableName) {

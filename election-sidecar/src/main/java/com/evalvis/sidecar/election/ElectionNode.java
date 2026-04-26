@@ -23,6 +23,7 @@ public final class ElectionNode implements AutoCloseable, LeaderState {
     private LeaderInfo leaderInfo = null;
     private long lastHeartbeatMs = 0;
     private long currentEpoch = 0;
+    private final java.util.concurrent.atomic.AtomicLong logicalClock = new java.util.concurrent.atomic.AtomicLong(0);
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
     private ScheduledFuture<?> heartbeatTask = null;
@@ -90,6 +91,7 @@ public final class ElectionNode implements AutoCloseable, LeaderState {
             currentLeaderId = self.nodeId();
             leaderInfo = new LeaderInfo(self.nodeId(), self.host(), self.dbPort(), self.electionPort());
             currentEpoch = epoch;
+            logicalClock.set(epoch * 1_000_000L); // Seed clock with epoch to avoid collisions
             if (heartbeatTask != null) heartbeatTask.cancel(false);
             heartbeatTask = scheduler.scheduleAtFixedRate(
                     this::sendHeartbeats, 0, config.healthCheckIntervalMs(), TimeUnit.MILLISECONDS
@@ -97,6 +99,11 @@ public final class ElectionNode implements AutoCloseable, LeaderState {
         }
         LOG.info("Node " + self.nodeId() + " became LEADER epoch=" + epoch);
         peers.forEach(peer -> httpClient.sendCoordinator(peer, leaderInfo, epoch));
+    }
+
+    @Override
+    public long nextVersion() {
+        return logicalClock.incrementAndGet();
     }
 
     void receiveElection(int candidateId, long epoch) {

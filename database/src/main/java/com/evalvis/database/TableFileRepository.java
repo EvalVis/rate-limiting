@@ -27,12 +27,12 @@ final class TableFileRepository {
         }
     }
 
-    void append(String tableName, String key, String value) {
+    void append(String tableName, String key, String value, long version) {
         Path tablePath = tablePath(tableName);
         if (!Files.exists(tablePath)) {
             throw new TableNotFoundException(tableName);
         }
-        String record = JsonLineCodec.encode(key, value) + System.lineSeparator();
+        String record = JsonLineCodec.encode(key, value, version) + System.lineSeparator();
         try {
             Files.writeString(tablePath, record, StandardOpenOption.APPEND);
         } catch (IOException exception) {
@@ -40,7 +40,7 @@ final class TableFileRepository {
         }
     }
 
-    Optional<String> find(String tableName, String key) {
+    Optional<JsonLineRecord> findRecord(String tableName, String key) {
         Path tablePath = tablePath(tableName);
         if (!Files.exists(tablePath)) {
             throw new TableNotFoundException(tableName);
@@ -50,7 +50,7 @@ final class TableFileRepository {
             for (int index = lines.size() - 1; index >= 0; index--) {
                 Optional<JsonLineRecord> parsed = JsonLineCodec.decode(lines.get(index));
                 if (parsed.isPresent() && parsed.get().key().equals(key)) {
-                    return Optional.of(parsed.get().value());
+                    return parsed;
                 }
             }
             return Optional.empty();
@@ -61,6 +61,7 @@ final class TableFileRepository {
 
     java.util.List<String> listTables() {
         try {
+            if (!Files.exists(rootDirectory)) return java.util.Collections.emptyList();
             return Files.list(rootDirectory)
                 .filter(p -> p.toString().endsWith(".jsonl"))
                 .map(p -> p.getFileName().toString().replace(".jsonl", ""))

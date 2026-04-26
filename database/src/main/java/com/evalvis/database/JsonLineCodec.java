@@ -5,27 +5,55 @@ import java.util.Optional;
 final class JsonLineCodec {
     private static final String PREFIX = "{\"key\":\"";
     private static final String MIDDLE = "\",\"value\":\"";
-    private static final String SUFFIX = "\"}";
+    private static final String VERSION_PREFIX = "\",\"version\":";
+    private static final String SUFFIX = "}";
+    private static final String OLD_SUFFIX = "\"}";
 
     private JsonLineCodec() {
     }
 
     static String encode(String key, String value) {
-        return PREFIX + escape(key) + MIDDLE + escape(value) + SUFFIX;
+        return encode(key, value, 0L);
+    }
+
+    static String encode(String key, String value, long version) {
+        return PREFIX + escape(key) + MIDDLE + escape(value) + VERSION_PREFIX + version + SUFFIX;
     }
 
     static Optional<JsonLineRecord> decode(String line) {
         if (line == null || !line.startsWith(PREFIX) || !line.endsWith(SUFFIX)) {
             return Optional.empty();
         }
-        String payload = line.substring(PREFIX.length(), line.length() - SUFFIX.length());
-        int separator = findSeparator(payload);
-        if (separator < 0) {
+
+        try {
+            if (line.endsWith(OLD_SUFFIX)) {
+                // Handle old format: {"key":"...","value":"..."}
+                String payload = line.substring(PREFIX.length(), line.length() - OLD_SUFFIX.length());
+                int separator = findSeparator(payload);
+                if (separator < 0) return Optional.empty();
+                String key = payload.substring(0, separator);
+                String value = payload.substring(separator + MIDDLE.length());
+                return Optional.of(new JsonLineRecord(unescape(key), unescape(value), 0L));
+            } else {
+                // Handle new format: {"key":"...","value":"...","version":123}
+                int versionIdx = line.lastIndexOf(VERSION_PREFIX);
+                if (versionIdx < 0) return Optional.empty();
+                
+                String kvPart = line.substring(PREFIX.length(), versionIdx);
+                int separator = findSeparator(kvPart);
+                if (separator < 0) return Optional.empty();
+                
+                String key = kvPart.substring(0, separator);
+                String value = kvPart.substring(separator + MIDDLE.length());
+                
+                String versionPart = line.substring(versionIdx + VERSION_PREFIX.length(), line.length() - SUFFIX.length());
+                long version = Long.parseLong(versionPart.trim());
+                
+                return Optional.of(new JsonLineRecord(unescape(key), unescape(value), version));
+            }
+        } catch (Exception e) {
             return Optional.empty();
         }
-        String key = payload.substring(0, separator);
-        String value = payload.substring(separator + MIDDLE.length());
-        return Optional.of(new JsonLineRecord(unescape(key), unescape(value)));
     }
 
     private static int findSeparator(String payload) {

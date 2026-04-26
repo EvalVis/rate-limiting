@@ -25,7 +25,7 @@ class SidecarTcpProxyTest {
         SpyReplicator spy = new SpyReplicator();
 
         try (FileDbTcpServer db = new FileDbTcpServer(dbPort, Files.createTempDirectory("sidecar-test"));
-             SidecarTcpProxy proxy = new SidecarTcpProxy("127.0.0.1", dbPort, proxyPort, () -> true, spy)) {
+             SidecarTcpProxy proxy = new SidecarTcpProxy("127.0.0.1", dbPort, proxyPort, leader(true), spy)) {
             db.start();
             proxy.start();
 
@@ -45,7 +45,7 @@ class SidecarTcpProxyTest {
         SpyReplicator spy = new SpyReplicator();
 
         try (FileDbTcpServer db = new FileDbTcpServer(dbPort, Files.createTempDirectory("sidecar-test"));
-             SidecarTcpProxy proxy = new SidecarTcpProxy("127.0.0.1", dbPort, proxyPort, () -> true, spy)) {
+             SidecarTcpProxy proxy = new SidecarTcpProxy("127.0.0.1", dbPort, proxyPort, leader(true), spy)) {
             db.start();
             proxy.start();
 
@@ -63,7 +63,7 @@ class SidecarTcpProxyTest {
         SpyReplicator spy = new SpyReplicator();
 
         try (FileDbTcpServer db = new FileDbTcpServer(dbPort, Files.createTempDirectory("sidecar-test"));
-             SidecarTcpProxy proxy = new SidecarTcpProxy("127.0.0.1", dbPort, proxyPort, () -> false, spy)) {
+             SidecarTcpProxy proxy = new SidecarTcpProxy("127.0.0.1", dbPort, proxyPort, leader(false), spy)) {
             db.start();
             proxy.start();
 
@@ -91,12 +91,30 @@ class SidecarTcpProxyTest {
         }
     }
 
+    private static LeaderState leader(boolean isLeader) {
+        return new LeaderState() {
+            @Override public boolean isLeader() { return isLeader; }
+            @Override public long nextVersion() { return 1L; }
+        };
+    }
+
     static class SpyReplicator implements Replicator {
         final List<String> commands = new ArrayList<>();
 
         @Override
         public void replicateAsync(String command) {
             commands.add(command);
+        }
+
+        @Override
+        public void replicateAsync(String command, long version) {
+            commands.add(command);
+        }
+
+        @Override
+        public boolean replicateSync(String command, long version, int requiredAcks) {
+            commands.add(command);
+            return true;
         }
     }
 }

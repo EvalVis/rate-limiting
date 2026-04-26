@@ -33,6 +33,9 @@ public final class ElectionSidecarApplication {
         int proxyPort = Integer.parseInt(env.getOrDefault("PROXY_PORT", "7380"));
         int electionPort = Integer.parseInt(env.getOrDefault("ELECTION_PORT", "8090"));
         long healthCheckMs = Long.parseLong(env.getOrDefault("HEALTH_CHECK_INTERVAL_MS", "500"));
+        
+        String consistencyMode = env.getOrDefault("CONSISTENCY_MODE", "EVENTUAL");
+        int quorumW = Integer.parseInt(env.getOrDefault("QUORUM_W", "1"));
 
         NodeConfig self = null;
         List<PeerInfo> peers = new ArrayList<>();
@@ -55,7 +58,9 @@ public final class ElectionSidecarApplication {
         ElectionConfig config = new ElectionConfig(healthCheckMs);
         ElectionNode electionNode = new ElectionNode(self, peers, config);
         ReplicationClient replicationClient = new ReplicationClient(peers);
-        SidecarTcpProxy proxy = new SidecarTcpProxy(localDbHost, localDbPort, proxyPort, electionNode, replicationClient);
+        SidecarTcpProxy proxy = new SidecarTcpProxy(localDbHost, localDbPort, proxyPort, 
+                                                   electionNode, replicationClient,
+                                                   consistencyMode, quorumW);
         ElectionHttpServer httpServer = new ElectionHttpServer(electionNode, electionPort, command -> {
             try {
                 return proxy.applyToLocalDb(command);
@@ -69,6 +74,7 @@ public final class ElectionSidecarApplication {
         electionNode.start();
 
         LOG.info("Election sidecar started: nodeId=" + nodeId
+                + " mode=" + consistencyMode + " quorumW=" + quorumW
                 + " proxyPort=" + proxyPort + " electionPort=" + electionPort
                 + " localDb=" + localDbHost + ":" + localDbPort);
 

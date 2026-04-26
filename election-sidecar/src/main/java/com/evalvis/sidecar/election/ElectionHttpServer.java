@@ -90,6 +90,18 @@ public final class ElectionHttpServer implements AutoCloseable {
 
     private void handleReplicate(HttpExchange exchange) throws IOException {
         String command = readBody(exchange);
+        String versionHeader = exchange.getRequestHeaders().getFirst("X-Record-Version");
+        if (versionHeader != null && !versionHeader.equals("0")) {
+            // Convert PUT table key value -> PUT_V table key version value
+            if (command.startsWith("PUT ")) {
+                String[] tokens = command.split("\\s+", 4);
+                if (tokens.length == 4) {
+                    command = "PUT_V " + tokens[1] + " " + tokens[2] + " " + versionHeader + " " + tokens[3];
+                }
+            } else if (command.startsWith("CREATE_TABLE ")) {
+                // CREATE_TABLE is idempotent, usually no version needed but we could add if needed
+            }
+        }
         try {
             String result = commandApplier.apply(command);
             respond(exchange, 200, SimpleJson.serialize(Map.of("result", result)));

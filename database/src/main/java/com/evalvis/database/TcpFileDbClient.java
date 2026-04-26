@@ -30,6 +30,12 @@ public final class TcpFileDbClient implements FileDbClient {
     }
 
     @Override
+    public void putVersioned(String tableName, String key, String value, long version) {
+        String response = send("PUT_V " + tableName + " " + key + " " + version + " " + value);
+        requireOk(response, tableName);
+    }
+
+    @Override
     public Optional<String> get(String tableName, String key) {
         String response = send("GET " + tableName + " " + key);
         if ("NOT_FOUND".equals(response)) {
@@ -40,6 +46,26 @@ public final class TcpFileDbClient implements FileDbClient {
         }
         if (response.startsWith("VALUE ")) {
             return Optional.of(response.substring("VALUE ".length()));
+        }
+        throw new IllegalStateException("Unexpected database response: " + response);
+    }
+
+    @Override
+    public Optional<JsonLineRecord> getRecord(String tableName, String key) {
+        String response = send("GET_V " + tableName + " " + key);
+        if ("NOT_FOUND".equals(response)) {
+            return Optional.empty();
+        }
+        if ("ERROR table_not_found".equals(response)) {
+            throw new TableNotFoundException(tableName);
+        }
+        if (response.startsWith("VALUE_V ")) {
+            String[] parts = response.substring("VALUE_V ".length()).split("\\s+", 2);
+            if (parts.length == 2) {
+                long version = Long.parseLong(parts[0]);
+                String value = parts[1];
+                return Optional.of(new JsonLineRecord(key, value, version));
+            }
         }
         throw new IllegalStateException("Unexpected database response: " + response);
     }
@@ -79,6 +105,9 @@ public final class TcpFileDbClient implements FileDbClient {
         }
         if ("ERROR table_not_found".equals(response)) {
             throw new TableNotFoundException(tableName);
+        }
+        if ("ERROR consistency_failure".equals(response)) {
+            throw new IllegalStateException("Consistency failure: quorum not reached");
         }
         throw new IllegalStateException("Unexpected database response: " + response);
     }
